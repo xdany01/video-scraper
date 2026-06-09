@@ -10,21 +10,21 @@ import { printTree, collectFiles } from './tree';
 import { log, formatBytes, formatDuration, setVerbose } from './logger';
 import { ScraperOptions } from './types';
 
-const DEFAULT_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v', 'ts'];
+const DEFAULT_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v', 'ts', 'pdf'];
 const DEFAULT_UA = 'Mozilla/5.0 (compatible; video-scraper/1.0)';
 
 const program = new Command();
 
 program
     .name('video-scraper')
-    .description('Descarga videos desde un sitio web con estructura de carpetas')
+    .description('Descarga videos y archivos desde un sitio web con estructura de carpetas')
     .version('1.0.0');
 
 // download (comando principal)
 program
     .command('download <url>')
     .alias('dl')
-    .description('Crawlea la URL y descarga todos los videos encontrados')
+    .description('Crawlea la URL y descarga todos los videos y archivos encontrados')
     .option('-o, --output <dir>', 'Directorio de salida', './downloads')
     .option('-c, --concurrency <n>', 'Descargas simultáneas', '5')
     .option('-r, --retries <n>', 'Reintentos por archivo fallido', '3')
@@ -71,10 +71,22 @@ program
         const files = collectFiles(tree);
 
         console.log('');
-        log.info(`Encontradas: ${chalk.bold(String(crawler.stats.foldersFound))} carpetas, ${chalk.bold(String(crawler.stats.filesFound))} videos`);
+        const pdfCount = files.filter(f => f.name.toLowerCase().endsWith('.pdf')).length;
+        const videoCount = files.length - pdfCount;
+
+        let foundDetails = '';
+        if (pdfCount > 0 && videoCount > 0) {
+            foundDetails = `${chalk.bold(String(videoCount))} videos, ${chalk.bold(String(pdfCount))} PDFs`;
+        } else if (pdfCount > 0) {
+            foundDetails = `${chalk.bold(String(pdfCount))} PDFs`;
+        } else {
+            foundDetails = `${chalk.bold(String(videoCount))} videos`;
+        }
+
+        log.info(`Encontradas: ${chalk.bold(String(crawler.stats.foldersFound))} carpetas, ${foundDetails}`);
 
         if (crawler.stats.filesFound === 0) {
-            log.warn('No se encontraron videos. Verificá la URL y las extensiones configuradas.');
+            log.warn('No se encontraron archivos. Verificá la URL y las extensiones configuradas.');
             process.exit(0);
         }
 
@@ -89,7 +101,8 @@ program
         console.log('');
 
         // Fase 2: Descarga
-        log.info('Fase 2/2: Descargando videos...');
+        const fileTypeLabel = pdfCount > 0 && videoCount > 0 ? 'videos y archivos' : (pdfCount > 0 ? 'PDFs' : 'videos');
+        log.info(`Fase 2/2: Descargando ${fileTypeLabel}...`);
         console.log('');
 
         if (!options.dryRun) {
@@ -128,7 +141,7 @@ program
 // tree (solo crawlea y muestra el árbol)
 program
     .command('tree <url>')
-    .description('Muestra la estructura de carpetas y videos sin descargar')
+    .description('Muestra la estructura de carpetas y archivos sin descargar')
     .option('-e, --extensions <exts>', 'Extensiones a buscar', DEFAULT_EXTENSIONS.join(','))
     .option('-d, --delay <ms>', 'Delay entre requests (ms)', '200')
     .option('--user-agent <ua>', 'User-Agent HTTP personalizado', DEFAULT_UA)
@@ -147,7 +160,21 @@ program
         console.log('');
         printTree(tree);
         console.log('');
-        log.info(`Total: ${crawler.stats.foldersFound} carpetas, ${crawler.stats.filesFound} videos`);
+
+        const files = collectFiles(tree);
+        const pdfCount = files.filter(f => f.name.toLowerCase().endsWith('.pdf')).length;
+        const videoCount = files.length - pdfCount;
+        
+        let foundDetails = '';
+        if (pdfCount > 0 && videoCount > 0) {
+            foundDetails = `${videoCount} videos, ${pdfCount} PDFs`;
+        } else if (pdfCount > 0) {
+            foundDetails = `${pdfCount} PDFs`;
+        } else {
+            foundDetails = `${videoCount} videos`;
+        }
+        
+        log.info(`Total: ${crawler.stats.foldersFound} carpetas, ${foundDetails}`);
         console.log('');
     });
 

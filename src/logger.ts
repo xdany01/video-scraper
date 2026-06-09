@@ -13,7 +13,7 @@ export const log = {
     error: (msg: string) => console.log(chalk.red('✖') + '  ' + msg),
     verbose: (msg: string) => { if (verboseMode) console.log(chalk.gray('·  ' + msg)); },
     folder: (path: string) => console.log(chalk.blue('📁') + ' ' + chalk.bold(path)),
-    file: (path: string) => console.log(chalk.magenta('🎬') + ' ' + path),
+    file: (path: string, isPdf = false) => console.log(chalk.magenta(isPdf ? '📄' : '🎬') + ' ' + path),
     dim: (msg: string) => console.log(chalk.dim(msg)),
 };
 

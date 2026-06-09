@@ -5,12 +5,12 @@ import * as url from 'url';
 import { TreeNode, FolderNode, FileNode, ScrapeStats } from './types';
 import { log } from './logger';
 
-const DEFAULT_VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v', '.ts', '.m3u8'];
+const DEFAULT_ALLOWED_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v', '.ts', '.m3u8', '.pdf'];
 
 export class Crawler {
     private visited = new Set<string>();
     private baseUrl: string;
-    private videoExtensions: string[];
+    private allowedExtensions: string[];
     private userAgent: string;
     private delay: number;
     public stats: ScrapeStats = {
@@ -22,9 +22,9 @@ export class Crawler {
         bytesDownloaded: 0,
     };
 
-    constructor(baseUrl: string, videoExtensions: string[], userAgent: string, delay: number) {
+    constructor(baseUrl: string, allowedExtensions: string[], userAgent: string, delay: number) {
         this.baseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-        this.videoExtensions = videoExtensions.map(e => e.startsWith('.') ? e : '.' + e);
+        this.allowedExtensions = allowedExtensions.map(e => e.startsWith('.') ? e : '.' + e);
         this.userAgent = userAgent;
         this.delay = delay;
     }
@@ -52,16 +52,6 @@ export class Crawler {
             return new url.URL(href, base).toString();
         } catch {
             return '';
-        }
-    }
-
-    private isVideoFile(href: string): boolean {
-        try {
-            const parsed = new url.URL(href, this.baseUrl);
-            const pathname = parsed.pathname.toLowerCase().split('?')[0];
-            return this.videoExtensions.some(ext => pathname.endsWith(ext));
-        } catch {
-            return false;
         }
     }
 
@@ -177,10 +167,10 @@ export class Crawler {
                 continue;
             }
 
-            // Archivo de video
+            // Archivo válido por extensión
             const ext = path.extname(cleanHref).toLowerCase();
-            if (ext && this.videoExtensions.includes(ext)) {
-                const fileName = this.getNameFromUrl(resolved) || text || 'video';
+            if (ext && this.allowedExtensions.includes(ext)) {
+                const fileName = this.getNameFromUrl(resolved) || text || (ext === '.pdf' ? 'document' : 'video');
                 const localPath = this.localPathFor(resolved, outputDir);
                 const fileNode: FileNode = {
                     type: 'file',
@@ -188,7 +178,8 @@ export class Crawler {
                     url: resolved,
                     localPath,
                 };
-                log.file(`${indent}  ${fileName}`);
+                const isPdf = ext === '.pdf';
+                log.file(`${indent}  ${fileName}`, isPdf);
                 node.children.push(fileNode);
                 this.stats.filesFound++;
             }
