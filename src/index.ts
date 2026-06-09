@@ -13,6 +13,42 @@ import { ScraperOptions } from './types';
 const DEFAULT_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'wmv', 'm4v', 'ts', 'pdf'];
 const DEFAULT_UA = 'Mozilla/5.0 (compatible; video-scraper/1.0)';
 
+export function getFolderNameFromUrl(urlStr: string): string {
+    let pathname = urlStr;
+    try {
+        const parsed = new URL(urlStr);
+        pathname = parsed.pathname;
+    } catch {
+        // Fallback in case of invalid URL structure
+        pathname = urlStr.split('?')[0].split('#')[0];
+    }
+
+    // Remove trailing slash if any
+    if (pathname.endsWith('/')) {
+        pathname = pathname.slice(0, -1);
+    }
+
+    // Get the last path segment
+    const segments = pathname.split('/');
+    let lastSegment = segments[segments.length - 1] || '';
+
+    // Decode percent-encoding
+    let decoded = '';
+    try {
+        decoded = decodeURIComponent(lastSegment);
+    } catch {
+        decoded = lastSegment;
+    }
+
+    // Replace dots with spaces if the text is separated by dots between words
+    const trimmed = decoded.trim();
+    if (trimmed.includes('.') && !trimmed.includes(' ')) {
+        decoded = trimmed.replace(/\./g, ' ');
+    }
+
+    return decoded || 'downloads';
+}
+
 const program = new Command();
 
 program
@@ -25,7 +61,7 @@ program
     .command('download <url>')
     .alias('dl')
     .description('Crawlea la URL y descarga todos los videos y archivos encontrados')
-    .option('-o, --output <dir>', 'Directorio de salida', './downloads')
+    .option('-o, --output <dir>', 'Directorio de salida')
     .option('-c, --concurrency <n>', 'Descargas simultáneas', '5')
     .option('-r, --retries <n>', 'Reintentos por archivo fallido', '3')
     .option('-d, --delay <ms>', 'Delay entre requests (ms)', '200')
@@ -35,9 +71,13 @@ program
     .option('-v, --verbose', 'Mostrar logs detallados')
     .option('--user-agent <ua>', 'User-Agent HTTP personalizado', DEFAULT_UA)
     .action(async (urlArg: string, opts) => {
+        let outputDir = opts.output;
+        if (!outputDir) {
+            outputDir = getFolderNameFromUrl(urlArg);
+        }
         const options: ScraperOptions = {
             url: urlArg,
-            output: path.resolve(opts.output),
+            output: path.resolve(outputDir),
             concurrency: parseInt(opts.concurrency, 10),
             dryRun: opts.dryRun ?? false,
             verbose: opts.verbose ?? false,
@@ -164,7 +204,7 @@ program
         const files = collectFiles(tree);
         const pdfCount = files.filter(f => f.name.toLowerCase().endsWith('.pdf')).length;
         const videoCount = files.length - pdfCount;
-        
+
         let foundDetails = '';
         if (pdfCount > 0 && videoCount > 0) {
             foundDetails = `${videoCount} videos, ${pdfCount} PDFs`;
@@ -173,7 +213,7 @@ program
         } else {
             foundDetails = `${videoCount} videos`;
         }
-        
+
         log.info(`Total: ${crawler.stats.foldersFound} carpetas, ${foundDetails}`);
         console.log('');
     });
